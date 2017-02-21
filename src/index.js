@@ -20,7 +20,10 @@ const defaultOptions = {
   },
   request: {},                          // client: request-specific additional options: https://github.com/request/request#requestoptions-callback
   defaultRouteMethod: 'POST',           // client/server: preferred communication method, please dont change
-  routeInterpolatePattern: /:([a-z0-9]+)/g // client/server: rule to extract tokens from urls, please dont change
+  routeInterpolatePattern: /:([a-z0-9]+)/g, // client/server: rule to extract tokens from urls, please dont change
+  defaultResponse: {
+    name: 'rest'
+  }
 }
 
 module.exports = (bishop, options = {}) => {
@@ -106,9 +109,7 @@ module.exports = (bishop, options = {}) => {
 
       // index route, can be used for healthchecks
       router.get('/', ctx => {
-        ctx.body = {
-          name: config.name
-        }
+        ctx.body = config.defaultResponse
       })
 
       // default transport route
