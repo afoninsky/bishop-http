@@ -31,16 +31,25 @@ module.exports = (bishop, options = {}) => {
   const config = ld.defaultsDeep({}, options, defaultOptions)
   const defaultTimeout = config.timeout || bishop.timeout // use own default timeout, or take from seneca
 
-  const localPatternFinder = message => {
-    const wrappedMessage = ld.assign({}, message, {
-      $local: true,                                       // always serach in local patterns only
-      $timeout: message.$timeout || defaultTimeout        // emit messages with custom timeout
-    })
+  // search pattern in local routes only
+  const findPatternAndAnswer = (ctx, message) => {
+    if (defaultTimeout && !message.$timeout) { // append transport-specific timeout if none set
+      message.$timeout = defaultTimeout
+    }
+    message.$local = true // search only in local patterns
+
     if (message.$nowait) {
-      bishop.act(wrappedMessage)
+      bishop.act(message)
       return { success: true }
     }
-    return bishop.act(wrappedMessage)
+    return bishop.act(message).then(res => {
+      ctx.body = res
+    }).catch(err => {
+      ctx.status = 400
+      ctx.body = {
+        error: err.message
+      }
+    })
   }
 
   // parse routes into local pattern matcher
@@ -114,16 +123,17 @@ module.exports = (bishop, options = {}) => {
 
       // default transport route
       router.post(config.defaultRoute, async ctx => {
-        const message = ctx.request.body
-        ctx.body = await localPatternFinder(message)
+        await findPatternAndAnswer(ctx, ctx.request.body)
       })
 
       // rest routes
       for (const route in config.routes) {
         const method = config.routes[route].toLowerCase()
         router[method](route, async ctx => {
-          const message = ld.assign({}, ctx.request.body || {}, ctx.query || {}, ctx.params || {})
-          ctx.body = await localPatternFinder(message)
+          await findPatternAndAnswer(
+            ctx,
+            ld.assign({}, ctx.request.body || {}, ctx.query || {}, ctx.params || {})
+          )
         })
       }
 
