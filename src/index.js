@@ -1,155 +1,93 @@
 const request = require('request-promise')
-const bloomrun = require('bloomrun')
 const ld = require('lodash')
 const koaRouter = require('koa-router')
 const parseBody = require('koa-bodyparser')
 const Koa = require('koa')
-const json = require('koa-json')
 
 const defaultOptions = {
-  name: 'rest',                         // client/server: transport name/alias
-  address: 'http://127.0.0.1:9000',     // client: transport endpoint
-  listenPort: 9000,                     // server: listen incoming requests on port
-  timeout: null,                        // client/server: will take from default seneca if not specified
-  defaultRoute: '/bishop',              // client/server: default route if routes not set
-  routes: {                             // client/server: human-friendly url pattern translation
-    // '/:role/:get': 'get',
-    // '/:role/:cmd': 'post',
-    // '/:role/:unset': 'delete',
-    // '/:role/:set': 'put'
-  },
+  name: 'http',                         // client/server: transport name/alias
+  pattern: null,                        // client ('http://localhost:9000')
+  remote: null,                        // client: transport endpoint (9000)
+  listenPort: null,                     // server: listen incoming requests on port
+  timeout: null,                        // client/server: will take from default bishop instance if not specified
   request: {},                          // client: request-specific additional options: https://github.com/request/request#requestoptions-callback
-  defaultRouteMethod: 'POST',           // client/server: preferred communication method, please dont change
-  routeInterpolatePattern: /:([a-z0-9]+)/g, // client/server: rule to extract tokens from urls, please dont change
   defaultResponse: {
-    name: 'rest'
+    name: 'http'
   }
 }
 
 module.exports = (bishop, options = {}) => {
-
   const config = ld.defaultsDeep({}, options, defaultOptions)
-  const defaultTimeout = config.timeout || bishop.timeout // use own default timeout, or take from seneca
+  const { timeout, name, pattern, remote, listenPort } = config
+  const defaultTimeout = timeout || bishop.config.timeout || 10000
 
-  // search pattern in local routes only
-  const findPatternAndAnswer = (ctx, message) => {
-    if (defaultTimeout && !message.$timeout) { // append transport-specific timeout if none set
-      message.$timeout = defaultTimeout
-    }
-    message.$local = true // search only in local patterns
+  if (remote) {
 
-    if (message.$nowait) {
-      bishop.act(message)
-      return { success: true }
-    }
-    return bishop.act(message).then(res => {
-      ctx.body = res
-    }).catch(err => {
-      ctx.status = 400
-      ctx.body = {
-        error: err.message
-      }
-    })
-  }
+    const client = request.defaults(ld.defaults({}, {
+      baseUrl: remote,
+      json: true
+    }, config.request))
 
-  // parse routes into local pattern matcher
-  const routesMatcher = bloomrun()
-  for (const route in config.routes) {
-    const pattern = route.split('/').reduce((prev, cur) => {
-      if (cur && cur[0] === ':') {
-        prev[cur.substring(1)] = /.*/
-      }
-      return prev
-    }, {})
-    routesMatcher.add(pattern, {
-      urlTemplate: ld.template(route, { interpolate: config.routeInterpolatePattern }),
-      urlFields: route.match(config.routeInterpolatePattern).map(item => item.substring(1)),
-      method: config.routes[route].toUpperCase()
-    })
-  }
-
-  // setup http client
-  let server
-  const client = request.defaults(ld.defaults({}, {
-    baseUrl: config.address,
-    json: true
-  }, config.request))
-
-  return {
-    name: config.name,
-    type: 'transport',
-    // connect: () => {}, // no need to connect: lazy connection will be performed on each request
-    // disconnect: () => {},
-
-    // request remote system and return result as promise
-    send: message => {
+    // register transport so local client can send request to remote system
+    bishop.addTransport(name, message => {
       const timeout = (message.$timeout || defaultTimeout) + 10
-      const rest = routesMatcher.lookup(message)
-      // no route matches found for rest api - will send to default route
-      if (!rest) {
-        return client({
-          uri: config.defaultRoute,
-          method: config.defaultRouteMethod,
-          body: message,
-          timeout
-        })
-      }
-      // we have route and method - will send 'like a rest'
-      const options = {
-        uri: rest.urlTemplate(message),
-        method: rest.method,
+      return client({
+        uri: '/bishop',
+        method: 'POST',
+        body: message,
         timeout
-      }
-
-      switch (rest.method) {
-        case 'GET':
-        case 'DELETE':
-          options.qs = ld.omit(message, rest.urlFields)
-          break
-        default:
-          options.body = ld.omit(message, rest.urlFields)
-      }
-      return client(options)
-    },
-
-    // start listen incoming requests
-    listen: () => {
-      const router = koaRouter()
-
-      // index route, can be used for healthchecks
-      router.get('/', ctx => {
-        ctx.body = config.defaultResponse
+      }).catch(err => {
+        const { response } = err
+        if (response.statusCode === 400 && response.body.error) {
+          const err = new Error()
+          const bodyErr = response.body.error
+          for (let i in bodyErr) {
+            err[i] = bodyErr[i]
+          }
+          throw err
+        }
+        throw err
       })
+    }, config)
 
-      // default transport route
-      router.post(config.defaultRoute, async ctx => {
-        await findPatternAndAnswer(ctx, ctx.request.body)
-      })
-
-      // rest routes
-      for (const route in config.routes) {
-        const method = config.routes[route].toLowerCase()
-        router[method](route, async ctx => {
-          await findPatternAndAnswer(
-            ctx,
-            ld.assign({}, ctx.request.body || {}, ctx.query || {}, ctx.params || {})
-          )
-        })
-      }
-
-      const app = new Koa()
-      app
-        .use(json({ pretty: false, param: 'pretty' })) // beautify json on '?pretty' parameter
-        .use(parseBody()) // extract body variables into req.body
-        .use(router.routes())
-        .use(router.allowedMethods())
-
-      server = app.listen(config.listenPort)
-    },
-
-    // stop listen incoming requests
-    close: () => {
-      server && server.close()
+    // add pattern for routes into remote system (can be omitted)
+    if (pattern) {
+      bishop.add(pattern, name)
     }
+
+  }
+
+  // act as server library: start listen request and response to it
+  if (listenPort) {
+    const router = koaRouter()
+
+    // index route: can be used for healthchecks
+    router.get('/', ctx => {
+      ctx.body = config.defaultResponse
+    })
+
+    // transport endpoint: search route locally and return result
+    router.post('/bishop', async ctx => {
+      const message = Object.assign({}, ctx.request.body, { // should search only in local routes
+        $local: true
+      })
+
+      try {
+        ctx.body = await bishop.act(message)
+      } catch (err) {
+        ctx.status = 400
+        ctx.body = {
+          error: ld.pick(err, ['name', 'message'])
+        }
+      }
+    })
+
+    const app = new Koa()
+    app
+      .use(parseBody()) // extract body variables into req.body
+      .use(router.routes())
+      .use(router.allowedMethods())
+
+    app.listen(listenPort)
   }
 }
