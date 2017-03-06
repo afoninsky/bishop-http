@@ -4,16 +4,21 @@ const request = require('request-promise')
 const transport = require(process.env.PWD)
 const Promise = require('bluebird')
 
+let port = 9000
+const getNextPort = () => ++port
+
 test('default answer', async t => {
   const bishop = new Bishop()
+  const port = getNextPort()
+
   await bishop.use(transport, {
     name: 'test',
     defaultResponse: {
       some: 'data'
     },
-    listenPort: 9001
+    listenPort: port
   })
-  const res = await request('http://localhost:9001')
+  const res = await request(`http://localhost:${port}`)
   const exp = JSON.stringify({ some: 'data', name: 'http' })
   t.deepEqual(res, exp)
 })
@@ -21,15 +26,16 @@ test('default answer', async t => {
 test('client-server interaction', async t => {
   const bishopServer = new Bishop()
   const bishopClient = new Bishop()
+  const port = getNextPort()
 
   await bishopClient.use(transport, {
     name: 'http-client',
-    remote: 'http://localhost:9002',
+    remote: `http://localhost:${port}`,
     pattern: 'some:stuff'
   })
   await bishopServer.use(transport, {
     name: 'http-server',
-    listenPort: 9002,
+    listenPort: port,
   })
   bishopServer.add('some:stuff', () => 'hello')
   t.is(await bishopClient.act('some:stuff, with:stuff'), 'hello')
@@ -40,14 +46,16 @@ test('ensure timeouts are inherited', async t => {
   const bishopClient = new Bishop({
     timeout: 100 // default timeout
   })
+  const port = getNextPort()
+
   await bishopServer.use(transport, {
     name: 'http-server',
-    listenPort: 9004,
+    listenPort: port,
   })
   await bishopClient.use(transport, {
     timeout: 200, // redefine default timeout
     name: 'http-client',
-    remote: 'http://localhost:9004',
+    remote: `http://localhost:${port}`,
     pattern: 'some:stuff'
   })
   bishopServer.add('some:stuff', async message => {
@@ -72,19 +80,32 @@ test('ensure timeouts are inherited', async t => {
 test('handle remote error', async t => {
   const bishopServer = new Bishop()
   const bishopClient = new Bishop()
+  const port = getNextPort()
 
   await bishopClient.use(transport, {
     name: 'http-client',
-    remote: 'http://localhost:9003',
+    remote: `http://localhost:${port}`,
     pattern: 'some:stuff'
   })
   await bishopServer.use(transport, {
     name: 'http-server',
-    listenPort: 9003,
+    listenPort: port,
   })
   bishopServer.add('some:stuff', () => {
     throw new Error('user error')
   })
 
   t.throws(bishopClient.act('some:stuff, with:error'), /user error/)
+})
+
+test('handle network error', async t => {
+  const bishopClient = new Bishop()
+  const port = getNextPort()
+
+  await bishopClient.use(transport, {
+    name: 'http-client',
+    remote: `http://localhost:${port}`,
+    pattern: 'some:stuff'
+  })
+  t.throws(bishopClient.act('some:stuff, with:error'), /ECONNREFUSED/)
 })

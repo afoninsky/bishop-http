@@ -38,7 +38,8 @@ module.exports = (bishop, options = {}) => {
         timeout
       }).catch(err => {
         const { response } = err
-        if (response.statusCode === 400 && response.body.error) {
+        // will handle only 400 error with correct json payload (from bishop-http client)
+        if (response && response.statusCode === 400 && response.body.error) {
           const err = new Error()
           const bodyErr = response.body.error
           for (let i in bodyErr) {
