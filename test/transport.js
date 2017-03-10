@@ -58,20 +58,20 @@ test('ensure timeouts are inherited', async t => {
     remote: `http://localhost:${port}`,
     pattern: 'some:stuff'
   })
-  bishopServer.add('some:stuff', async message => {
+  bishopServer.add('some:stuff', async (message, headers) => {
     await Promise.delay(message.delay || 0)
     return {
-      timeout: parseInt(message.$timeout, 10)
+      timeout: parseInt(headers.timeout, 10)
     }
   })
-  const res1 = await bishopClient.act('some:stuff')
-  t.is(res1.timeout, 200, 'should rewrite default timeout')
+  const res1 = await bishopClient.actRaw('some:stuff')
+  t.is(res1.headers.timeout, 200, 'should rewrite default timeout')
 
-  const res2 = await bishopClient.act('some:stuff, $timeout:201')
-  t.is(res2.timeout, 201, 'should take timeout from query if set')
+  const res2 = await bishopClient.actRaw('some:stuff, $timeout:201')
+  t.is(res2.headers.timeout, '201', 'should take timeout from query if set')
 
-  const res3 = await bishopClient.act('some:stuff, delay:150')
-  t.is(res3.timeout, 200, 'should use redefined timeout and not throw')
+  const res3 = await bishopClient.actRaw('some:stuff, delay:150')
+  t.is(res3.headers.timeout, 200, 'should use redefined timeout and not throw')
 
   t.throws(bishopClient.act('some:stuff, delay:210'))
 
