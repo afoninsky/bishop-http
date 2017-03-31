@@ -40,8 +40,11 @@ module.exports = (bishop, options = {}) => {
         const { response } = err
         // will handle only 400 error with correct json payload (from bishop-http client)
         if (response && response.statusCode === 400 && response.body.error) {
-          const err = new Error()
-          const bodyErr = response.body.error
+          let bodyErr = response.body.error
+          if (typeof bodyErr === 'string') {
+            throw new Error(bodyErr)
+          }
+          const err = new Error('unsupported error from remote server')
           for (let i in bodyErr) {
             err[i] = bodyErr[i]
           }
