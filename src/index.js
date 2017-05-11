@@ -29,13 +29,13 @@ module.exports = (bishop, options = {}) => {
     }, config.request))
 
     // register transport so local client can send request to remote system
-    bishop.addTransport(name, (message, headers) => {
-      const { input } = headers
-      const timeout = (input.$timeout || defaultTimeout) + 10
+    bishop.register('remote', name, (message, headers) => {
+      const { source } = headers
+      const timeout = (source.$timeout || defaultTimeout) + 10
       return client({
         uri: '/bishop',
         method: 'POST',
-        body: input,
+        body: source,
         timeout
       }).catch(err => {
         const { response } = err
