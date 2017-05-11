@@ -1,6 +1,6 @@
 {
   "name": "bishop-http",
-  "version": "1.0.3",
+  "version": "2.0.0",
   "description": "http-transport plugin for bishop.js library",
   "main": "index.js",
   "scripts": {
@@ -20,19 +20,19 @@
   },
   "homepage": "https://github.com/afoninsky/bishop-http#readme",
   "devDependencies": {
-    "ava": "^0.18.2",
-    "bishop": "^4.1.0",
-    "eslint": "^3.16.1",
+    "ava": "^0.19.1",
+    "bishop": "^5.0.2",
+    "eslint": "^3.19.0",
     "eslint-plugin-output-todo-comments": "0.0.7",
-    "nyc": "^10.1.2"
+    "nyc": "^10.3.2"
   },
   "dependencies": {
-    "koa": "next",
-    "koa-bodyparser": "next",
-    "koa-router": "next",
+    "koa": "^2.2.0",
+    "koa-bodyparser": "^4.2.0",
+    "koa-router": "^7.1.1",
     "lodash": "^4.17.4",
-    "request": "^2.79.0",
-    "request-promise": "^4.1.1"
+    "request": "^2.81.0",
+    "request-promise": "^4.2.1"
   },
   "ava": {
     "verbose": true,
