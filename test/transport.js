@@ -74,7 +74,7 @@ test('ensure timeouts are inherited', async t => {
   // const res3 = await bishopClient.actRaw('some:stuff, delay:150')
   // t.is(res3.headers.timeout, 200, 'should use redefined timeout and not throw')
 
-  t.throws(bishopClient.act('some:stuff, delay:210'))
+  await t.throws(bishopClient.act('some:stuff, delay:210'))
 
 })
 
@@ -96,7 +96,7 @@ test('handle remote error', async t => {
     throw new Error('user error')
   })
 
-  t.throws(bishopClient.act('some:stuff, with:error'), /user error/)
+  await t.throws(bishopClient.act('some:stuff, with:error'), /user error/)
 })
 
 test('handle network error', async t => {
@@ -108,5 +108,5 @@ test('handle network error', async t => {
     remote: `http://localhost:${port}`,
     pattern: 'some:stuff'
   })
-  t.throws(bishopClient.act('some:stuff, with:error'), /ECONNREFUSED/)
+  await t.throws(bishopClient.act('some:stuff, with:error'), /ECONNREFUSED/)
 })
