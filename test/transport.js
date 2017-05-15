@@ -30,9 +30,10 @@ test('client-server interaction', async t => {
 
   await bishopClient.use(transport, {
     name: 'http-client',
-    remote: `http://localhost:${port}`,
-    pattern: 'some:stuff'
+    remote: `http://localhost:${port}`
   })
+  bishopClient.add('some:stuff', 'http-client')
+
   await bishopServer.use(transport, {
     name: 'http-server',
     listenPort: port,
@@ -55,9 +56,10 @@ test('ensure timeouts are inherited', async t => {
   await bishopClient.use(transport, {
     timeout: 200, // redefine default timeout
     name: 'http-client',
-    remote: `http://localhost:${port}`,
-    pattern: 'some:stuff'
+    remote: `http://localhost:${port}`
   })
+  bishopClient.add('some:stuff', 'http-client')
+
   bishopServer.add('some:stuff', async (message, headers) => {
     await Promise.delay(message.delay || 0)
     return {
@@ -85,9 +87,10 @@ test('handle remote error', async t => {
 
   await bishopClient.use(transport, {
     name: 'http-client',
-    remote: `http://localhost:${port}`,
-    pattern: 'some:stuff'
+    remote: `http://localhost:${port}`
   })
+  bishopClient.add('some:stuff', 'http-client')
+
   await bishopServer.use(transport, {
     name: 'http-server',
     listenPort: port,
@@ -105,8 +108,8 @@ test('handle network error', async t => {
 
   await bishopClient.use(transport, {
     name: 'http-client',
-    remote: `http://localhost:${port}`,
-    pattern: 'some:stuff'
-  })
+    remote: `http://localhost:${port}`,  })
+  bishopClient.add('some:stuff', 'http-client')
+
   await t.throws(bishopClient.act('some:stuff, with:error'), /ECONNREFUSED/)
 })
