@@ -3,6 +3,8 @@ const Bishop = require('bishop')
 const request = require('request-promise')
 const transport = require(process.env.PWD)
 const Promise = require('bluebird')
+const Koa = require('koa')
+const Router = require('koa-router')
 
 let port = 9000
 const getNextPort = () => ++port
@@ -21,6 +23,29 @@ test('default answer', async t => {
   const res = await request(`http://localhost:${port}`)
   const exp = JSON.stringify({ some: 'data', name: 'http' })
   t.deepEqual(res, exp)
+})
+
+test('own router instance', async t => {
+  const bishop = new Bishop()
+  const port = getNextPort()
+
+  const koa = new Koa()
+  const router = new Router()
+
+  router.get('/custom', ctx => {
+    ctx.body = 'custom instance'
+  })
+
+  await bishop.use(transport, {
+    name: 'test',
+    defaultResponse: {
+      some: 'data'
+    },
+    listenPort: port
+  }, { koa, router })
+
+  const res = await request(`http://localhost:${port}/custom`)
+  t.is(res, 'custom instance')
 })
 
 test('client-server interaction', async t => {

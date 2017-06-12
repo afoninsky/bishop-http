@@ -5,8 +5,8 @@ const Koa = require('koa')
 
 module.exports = {
 
-  createLocalServer(bishop, config) {
-    const router = koaRouter()
+  createLocalServer(bishop, config, instances = {}) {
+    const router = instances.router || koaRouter()
 
     // index route: can be used for healthchecks
     router.get('/', ctx => {
@@ -29,7 +29,7 @@ module.exports = {
       }
     })
 
-    const app = new Koa()
+    const app = instances.koa || new Koa()
     app
       .use(parseBody()) // extract body variables into req.body
       .use(router.routes())

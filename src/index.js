@@ -13,13 +13,14 @@ const defaultOptions = {
   }
 }
 
-module.exports = (bishop, options = {}) => {
+// instances: koa, router
+module.exports = (bishop, options = {}, instances) => {
   const config = ld.defaultsDeep({}, options, defaultOptions)
   const defaultTimeout = config.timeout || bishop.config.timeout || 10000
 
   // act as server library: start listen request and response to it
   if (config.listenPort) {
-    createLocalServer(bishop, config)
+    createLocalServer(bishop, config, instances)
   }
 
   const methods = {}
