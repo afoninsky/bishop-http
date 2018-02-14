@@ -9,22 +9,6 @@ const Router = require('koa-router')
 let port = 9000
 const getNextPort = () => ++port
 
-test('default answer', async t => {
-  const bishop = new Bishop()
-  const port = getNextPort()
-
-  await bishop.use(transport, {
-    name: 'test',
-    defaultResponse: {
-      some: 'data'
-    },
-    listenPort: port
-  })
-  const res = await request(`http://localhost:${port}`)
-  const exp = JSON.stringify({ some: 'data', name: 'http' })
-  t.deepEqual(res, exp)
-})
-
 test('own router instance', async t => {
   const bishop = new Bishop()
   const port = getNextPort()
@@ -36,13 +20,18 @@ test('own router instance', async t => {
     ctx.body = 'custom instance'
   })
 
-  await bishop.use(transport, {
-    name: 'test',
-    defaultResponse: {
-      some: 'data'
+  await bishop.use(
+    transport,
+    {
+      name: 'test',
+      defaultResponse: {
+        some: 'data'
+      }
     },
-    listenPort: port
-  }, { koa, router })
+    { koa, router }
+  )
+  koa.use(router.routes()).use(router.allowedMethods())
+  koa.listen(port)
 
   const res = await request(`http://localhost:${port}/custom`)
   t.is(res, 'custom instance')
@@ -61,7 +50,7 @@ test('client-server interaction', async t => {
 
   await bishopServer.use(transport, {
     name: 'http-server',
-    listenPort: port,
+    port
   })
   bishopServer.add('some:stuff', () => 'hello')
   t.is(await bishopClient.act('some:stuff, with:stuff'), 'hello')
@@ -76,7 +65,7 @@ test('ensure timeouts are inherited', async t => {
 
   await bishopServer.use(transport, {
     name: 'http-server',
-    listenPort: port,
+    port
   })
   await bishopClient.use(transport, {
     timeout: 200, // redefine default timeout
@@ -102,7 +91,6 @@ test('ensure timeouts are inherited', async t => {
   // t.is(res3.headers.timeout, 200, 'should use redefined timeout and not throw')
 
   await t.throws(bishopClient.act('some:stuff, delay:210'))
-
 })
 
 test('handle remote error', async t => {
@@ -118,7 +106,7 @@ test('handle remote error', async t => {
 
   await bishopServer.use(transport, {
     name: 'http-server',
-    listenPort: port,
+    port
   })
   bishopServer.add('some:stuff', () => {
     throw new Error('user error')
@@ -133,7 +121,8 @@ test('handle network error', async t => {
 
   await bishopClient.use(transport, {
     name: 'http-client',
-    remote: `http://localhost:${port}`,  })
+    remote: `http://localhost:${port}`
+  })
   bishopClient.add('some:stuff', 'http-client')
 
   await t.throws(bishopClient.act('some:stuff, with:error'), /ECONNREFUSED/)

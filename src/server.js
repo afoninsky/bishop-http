@@ -4,18 +4,13 @@ const parseBody = require('koa-bodyparser')
 const Koa = require('koa')
 
 module.exports = {
-
   createLocalServer(bishop, config, instances = {}) {
-    const router = instances.router || koaRouter()
-
-    // index route: can be used for healthchecks
-    router.get('/', ctx => {
-      ctx.body = config.defaultResponse
-    })
+    const { router = koaRouter(), koa } = instances
 
     // transport endpoint: search route locally and return result
     router.post('/bishop', async ctx => {
-      const message = Object.assign({}, ctx.request.body, { // should search only in local routes
+      const message = Object.assign({}, ctx.request.body, {
+        // should search only in local routes
         $local: true
       })
 
@@ -29,13 +24,14 @@ module.exports = {
       }
     })
 
-    const app = instances.koa || new Koa()
-    app
-      .use(parseBody()) // extract body variables into req.body
-      .use(router.routes())
-      .use(router.allowedMethods())
+    const app = koa ? koa : new Koa()
+    app.use(parseBody())
 
-    app.listen(config.listenPort)
+    // start new instance if none passed
+    if (!koa) {
+      app.use(router.routes()).use(router.allowedMethods())
+      app.listen(config.port)
+    }
     return { app, router }
   }
 }
