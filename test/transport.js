@@ -1,5 +1,5 @@
 const { test } = require('ava')
-const Bishop = require('bishop')
+const Bishop = require('@fulldive/bishop')
 const request = require('request-promise')
 const transport = require(process.env.PWD)
 const Promise = require('bluebird')
